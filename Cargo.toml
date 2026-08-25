@@ -1,0 +1,7 @@
+[package]
+name = "hourbook"
+version = "0.1.0"
+edition = "2021"
+authors = ["rjones493"]
+license = "MIT"
+description = "Plain-text timesheet parsing and summarizing, no dependencies."
