@@ -20,8 +20,10 @@ DATE START-END PROJECT [NOTE]
 ```
 
 - `DATE` is `YYYY-MM-DD`.
-- `START-END` is two `HH:MM` times (24-hour) joined by a dash. End must be
-  after start — entries can't cross midnight yet, see below.
+- `START-END` is two `HH:MM` times (24-hour) joined by a dash. If `END` is
+  at or before `START`, the shift is assumed to run past midnight and
+  counted through to that time the next day (`22:00-02:00` is 4 hours).
+  Start and end can't be equal — that's rejected as ambiguous.
 - `PROJECT` is a single word (no spaces).
 - Anything after the project is a free-text note, kept for your own record
   but not currently used in the summary.
@@ -77,12 +79,12 @@ going through the binary at all.
 
 ## Status
 
-This is the first pass: parsing, a single project summary, and stdin
-support. No third-party crates, and none are planned.
+This is the first pass: parsing (including overnight shifts), a single
+project summary, and stdin support. No third-party crates, and none are
+planned.
 
 Known gaps, in the order I'll probably get to them:
 
-- entries that cross midnight
 - a daily breakdown, not just per-project totals
 - filtering by date range
 - CSV output for pasting into invoices

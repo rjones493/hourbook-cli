@@ -16,7 +16,7 @@ pub enum ParseError {
     BadFormat,
     BadDate(String),
     BadTime(String),
-    EndBeforeStart,
+    ZeroDuration,
 }
 
 impl fmt::Display for ParseError {
@@ -25,7 +25,7 @@ impl fmt::Display for ParseError {
             ParseError::BadFormat => write!(f, "expected 'DATE START-END PROJECT [NOTE]'"),
             ParseError::BadDate(s) => write!(f, "bad date '{}'", s),
             ParseError::BadTime(s) => write!(f, "bad time '{}'", s),
-            ParseError::EndBeforeStart => write!(f, "end time is not after start time"),
+            ParseError::ZeroDuration => write!(f, "start and end time are the same"),
         }
     }
 }
@@ -120,9 +120,20 @@ pub struct Entry {
     pub note: Option<String>,
 }
 
+const MINUTES_PER_DAY: u32 = 24 * 60;
+
 impl Entry {
+    /// Minutes worked. An end time at or before the start time means the
+    /// shift ran past midnight, so it's counted through to that time on
+    /// the following day.
     pub fn duration_minutes(&self) -> u32 {
-        self.end.minutes_since_midnight() - self.start.minutes_since_midnight()
+        let start = self.start.minutes_since_midnight();
+        let end = self.end.minutes_since_midnight();
+        if end > start {
+            end - start
+        } else {
+            (MINUTES_PER_DAY - start) + end
+        }
     }
 }
 
@@ -143,8 +154,8 @@ pub fn parse_line(line: &str) -> Result<Entry, ParseError> {
         .ok_or(ParseError::BadFormat)?;
     let start = Time::parse(start_str)?;
     let end = Time::parse(end_str)?;
-    if end.minutes_since_midnight() <= start.minutes_since_midnight() {
-        return Err(ParseError::EndBeforeStart);
+    if start == end {
+        return Err(ParseError::ZeroDuration);
     }
 
     Ok(Entry { date, start, end, project, note })
@@ -181,9 +192,21 @@ mod tests {
     }
 
     #[test]
-    fn rejects_end_before_start() {
-        let err = parse_line("2026-08-25 12:00-09:00 acme").unwrap_err();
-        assert!(matches!(err, ParseError::EndBeforeStart));
+    fn rejects_zero_duration() {
+        let err = parse_line("2026-08-25 09:00-09:00 acme").unwrap_err();
+        assert!(matches!(err, ParseError::ZeroDuration));
+    }
+
+    #[test]
+    fn crosses_midnight() {
+        let entry = parse_line("2026-08-25 22:00-02:00 acme night shift").unwrap();
+        assert_eq!(entry.duration_minutes(), 240);
+    }
+
+    #[test]
+    fn crosses_midnight_at_the_boundary() {
+        let entry = parse_line("2026-08-25 23:59-00:01 acme").unwrap();
+        assert_eq!(entry.duration_minutes(), 2);
     }
 
     #[test]
