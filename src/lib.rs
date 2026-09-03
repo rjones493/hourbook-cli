@@ -170,6 +170,19 @@ pub fn summarize_by_project(entries: &[Entry]) -> BTreeMap<String, u32> {
     totals
 }
 
+/// Total minutes worked per day, in date order.
+///
+/// An entry that crosses midnight is attributed to its start date, not
+/// split across the two days it touches — that keeps this a straight sum
+/// of `duration_minutes()` and matches how someone would log it by hand.
+pub fn summarize_by_day(entries: &[Entry]) -> BTreeMap<Date, u32> {
+    let mut totals: BTreeMap<Date, u32> = BTreeMap::new();
+    for entry in entries {
+        *totals.entry(entry.date).or_insert(0) += entry.duration_minutes();
+    }
+    totals
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -234,5 +247,25 @@ mod tests {
         let totals = summarize_by_project(&entries);
         assert_eq!(totals.get("acme"), Some(&420));
         assert_eq!(totals.get("globex"), Some(&90));
+    }
+
+    #[test]
+    fn summarizes_by_day() {
+        let entries = vec![
+            parse_line("2026-08-25 09:00-12:00 acme").unwrap(),
+            parse_line("2026-08-25 13:00-17:00 globex").unwrap(),
+            parse_line("2026-08-26 09:00-10:30 acme").unwrap(),
+        ];
+        let totals = summarize_by_day(&entries);
+        assert_eq!(totals.get(&Date { year: 2026, month: 8, day: 25 }), Some(&420));
+        assert_eq!(totals.get(&Date { year: 2026, month: 8, day: 26 }), Some(&90));
+    }
+
+    #[test]
+    fn overnight_entry_is_attributed_to_its_start_date() {
+        let entries = vec![parse_line("2026-08-25 22:00-02:00 acme night shift").unwrap()];
+        let totals = summarize_by_day(&entries);
+        assert_eq!(totals.get(&Date { year: 2026, month: 8, day: 25 }), Some(&240));
+        assert_eq!(totals.get(&Date { year: 2026, month: 8, day: 26 }), None);
     }
 }

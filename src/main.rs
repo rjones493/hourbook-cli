@@ -6,8 +6,18 @@ use std::process::ExitCode;
 use hourbook::Entry;
 
 fn main() -> ExitCode {
-    let args: Vec<String> = env::args().skip(1).collect();
-    let sources = if args.is_empty() { vec!["-".to_string()] } else { args };
+    let mut daily = false;
+    let mut sources: Vec<String> = Vec::new();
+    for arg in env::args().skip(1) {
+        if arg == "--daily" {
+            daily = true;
+        } else {
+            sources.push(arg);
+        }
+    }
+    if sources.is_empty() {
+        sources.push("-".to_string());
+    }
 
     let mut entries: Vec<Entry> = Vec::new();
     let mut had_error = false;
@@ -26,6 +36,14 @@ fn main() -> ExitCode {
             }
         };
         had_error |= !ok;
+    }
+
+    if daily {
+        let day_totals = hourbook::summarize_by_day(&entries);
+        for (date, minutes) in &day_totals {
+            println!("{:<24} {:>4}:{:02}", date, minutes / 60, minutes % 60);
+        }
+        println!();
     }
 
     let totals = hourbook::summarize_by_project(&entries);
