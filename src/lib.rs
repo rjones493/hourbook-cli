@@ -161,6 +161,23 @@ pub fn parse_line(line: &str) -> Result<Entry, ParseError> {
     Ok(Entry { date, start, end, project, note })
 }
 
+/// Keeps only entries whose date falls within `[from, to]`. Either bound
+/// can be omitted to leave that side of the range open.
+pub fn filter_by_date_range(entries: &[Entry], from: Option<Date>, to: Option<Date>) -> Vec<Entry> {
+    entries
+        .iter()
+        .filter(|e| match from {
+            Some(d) => e.date >= d,
+            None => true,
+        })
+        .filter(|e| match to {
+            Some(d) => e.date <= d,
+            None => true,
+        })
+        .cloned()
+        .collect()
+}
+
 /// Total minutes worked per project, in project name order.
 pub fn summarize_by_project(entries: &[Entry]) -> BTreeMap<String, u32> {
     let mut totals: BTreeMap<String, u32> = BTreeMap::new();
@@ -267,5 +284,55 @@ mod tests {
         let totals = summarize_by_day(&entries);
         assert_eq!(totals.get(&Date { year: 2026, month: 8, day: 25 }), Some(&240));
         assert_eq!(totals.get(&Date { year: 2026, month: 8, day: 26 }), None);
+    }
+
+    fn sample_entries() -> Vec<Entry> {
+        vec![
+            parse_line("2026-08-24 09:00-10:00 acme").unwrap(),
+            parse_line("2026-08-25 09:00-10:00 acme").unwrap(),
+            parse_line("2026-08-26 09:00-10:00 acme").unwrap(),
+        ]
+    }
+
+    #[test]
+    fn filter_by_date_range_with_both_bounds() {
+        let entries = sample_entries();
+        let from = Date { year: 2026, month: 8, day: 25 };
+        let to = Date { year: 2026, month: 8, day: 25 };
+        let filtered = filter_by_date_range(&entries, Some(from), Some(to));
+        assert_eq!(filtered.len(), 1);
+        assert_eq!(filtered[0].date, from);
+    }
+
+    #[test]
+    fn filter_by_date_range_is_inclusive_of_both_ends() {
+        let entries = sample_entries();
+        let from = Date { year: 2026, month: 8, day: 24 };
+        let to = Date { year: 2026, month: 8, day: 26 };
+        let filtered = filter_by_date_range(&entries, Some(from), Some(to));
+        assert_eq!(filtered.len(), 3);
+    }
+
+    #[test]
+    fn filter_by_date_range_with_open_lower_bound() {
+        let entries = sample_entries();
+        let to = Date { year: 2026, month: 8, day: 25 };
+        let filtered = filter_by_date_range(&entries, None, Some(to));
+        assert_eq!(filtered.len(), 2);
+    }
+
+    #[test]
+    fn filter_by_date_range_with_open_upper_bound() {
+        let entries = sample_entries();
+        let from = Date { year: 2026, month: 8, day: 25 };
+        let filtered = filter_by_date_range(&entries, Some(from), None);
+        assert_eq!(filtered.len(), 2);
+    }
+
+    #[test]
+    fn filter_by_date_range_with_no_bounds_keeps_everything() {
+        let entries = sample_entries();
+        let filtered = filter_by_date_range(&entries, None, None);
+        assert_eq!(filtered.len(), 3);
     }
 }

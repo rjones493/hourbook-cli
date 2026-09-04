@@ -69,6 +69,15 @@ acme                       8:45
 globex                     1:30
 ```
 
+Add `--from` and `--to` (each `YYYY-MM-DD`) to restrict the summary to a
+date range, inclusive on both ends. Either can be given without the other
+to leave that side open:
+
+```
+$ hourbook --from 2026-08-25 --to 2026-08-25 timesheet.txt
+acme                       8:45
+```
+
 Parse errors are printed to stderr with the source and line number, and
 don't stop the rest of the file from being processed:
 
@@ -83,6 +92,7 @@ acme                       8:45
 The CLI is a thin wrapper around the `hourbook` crate. The pieces:
 
 - `parse_line(&str) -> Result<Entry, ParseError>`
+- `filter_by_date_range(&[Entry], Option<Date>, Option<Date>) -> Vec<Entry>`
 - `summarize_by_project(&[Entry]) -> BTreeMap<String, u32>` (minutes)
 - `summarize_by_day(&[Entry]) -> BTreeMap<Date, u32>` (minutes; an entry
   that crosses midnight is attributed to its start date)
@@ -94,11 +104,10 @@ going through the binary at all.
 ## Status
 
 This is the first pass: parsing (including overnight shifts), per-project
-and per-day summaries, and stdin support. No third-party crates, and none
-are planned.
+and per-day summaries, date-range filtering, and stdin support. No
+third-party crates, and none are planned.
 
 Known gaps, in the order I'll probably get to them:
 
-- filtering by date range
 - CSV output for pasting into invoices
 - configurable rounding (e.g. round to nearest 15 minutes)

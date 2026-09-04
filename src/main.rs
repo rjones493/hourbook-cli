@@ -3,16 +3,36 @@ use std::fs::File;
 use std::io::{self, BufRead, BufReader};
 use std::process::ExitCode;
 
-use hourbook::Entry;
+use hourbook::{Date, Entry};
 
 fn main() -> ExitCode {
     let mut daily = false;
+    let mut from: Option<Date> = None;
+    let mut to: Option<Date> = None;
     let mut sources: Vec<String> = Vec::new();
-    for arg in env::args().skip(1) {
-        if arg == "--daily" {
-            daily = true;
-        } else {
-            sources.push(arg);
+    let mut args = env::args().skip(1);
+    while let Some(arg) = args.next() {
+        match arg.as_str() {
+            "--daily" => daily = true,
+            "--from" | "--to" => {
+                let Some(value) = args.next() else {
+                    eprintln!("hourbook: {} needs a YYYY-MM-DD argument", arg);
+                    return ExitCode::FAILURE;
+                };
+                let date = match Date::parse(&value) {
+                    Ok(d) => d,
+                    Err(e) => {
+                        eprintln!("hourbook: {}: {}", arg, e);
+                        return ExitCode::FAILURE;
+                    }
+                };
+                if arg == "--from" {
+                    from = Some(date);
+                } else {
+                    to = Some(date);
+                }
+            }
+            _ => sources.push(arg),
         }
     }
     if sources.is_empty() {
@@ -37,6 +57,8 @@ fn main() -> ExitCode {
         };
         had_error |= !ok;
     }
+
+    let entries = hourbook::filter_by_date_range(&entries, from, to);
 
     if daily {
         let day_totals = hourbook::summarize_by_day(&entries);
